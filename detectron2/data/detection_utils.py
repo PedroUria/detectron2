@@ -581,6 +581,14 @@ def build_augmentation(cfg, is_train):
     augmentation = [T.ResizeShortestEdge(min_size, max_size, sample_style)]
     if is_train:
         augmentation.append(T.RandomFlip())
+        if cfg.INPUT.COLOR_JITTER.ENABLED:
+            augmentation.append(T.RandomLighting(cfg.INPUT.COLOR_JITTER.SCALE))
+        if cfg.INPUT.SATURATION.ENABLED:
+            sat_min, sat_max = cfg.INPUT.SATURATION.RANGE
+            augmentation.append(T.RandomSaturation(sat_min, sat_max))
+        if cfg.INPUT.CONTRAST.ENABLED:
+            contrast_min, contrast_max = cfg.INPUT.CONTRAST.RANGE
+            augmentation.append(T.RandomContrast(contrast_min, contrast_max))
     return augmentation
 
 
