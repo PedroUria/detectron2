@@ -83,6 +83,12 @@ _C.INPUT.CONTRAST.RANGE = [0.5, 1.0]
 _C.INPUT.SATURATION = CN({"ENABLED": False})
 # range of values for saturation
 _C.INPUT.SATURATION.RANGE = [0.5, 1.0]
+# rotation
+_C.INPUT.ROTATION = CN({"ENABLED": False})
+# sampling ("choice" or "range")
+_C.INPUT.ROTATION.SAMPLING = "choice"
+# values for rotation
+_C.INPUT.ROTATION.VALUES = [90, 180, 270]
 
 # Whether the model needs RGB, YUV, HSV etc.
 # Should be one of the modes defined here, as we use PIL to read the image:
