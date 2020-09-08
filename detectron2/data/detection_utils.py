@@ -589,6 +589,10 @@ def build_augmentation(cfg, is_train):
         if cfg.INPUT.CONTRAST.ENABLED:
             contrast_min, contrast_max = cfg.INPUT.CONTRAST.RANGE
             augmentation.append(T.RandomContrast(contrast_min, contrast_max))
+            if cfg.INPUT.ROTATION.ENABLED:
+                augmentation.append(T.RandomRotation(cfg.INPUT.ROTATION.VALUES,
+                                                     sample_style=cfg.INPUT.ROTATION.SAMPLING))
+
     return augmentation
 
 

@@ -98,7 +98,7 @@ class DatasetEvaluators(DatasetEvaluator):
         return results
 
 
-def inference_on_dataset(model, data_loader, evaluator):
+def inference_on_dataset(model, data_loader, evaluator, bit_16=False, use_autocast=False):
     """
     Run model on the data_loader and evaluate the metrics with evaluator.
     Also benchmark the inference speed of `model.forward` accurately.
@@ -118,6 +118,10 @@ def inference_on_dataset(model, data_loader, evaluator):
     Returns:
         The return value of `evaluator.evaluate()`
     """
+
+    if bit_16 and use_autocast:
+        import sys; print("Please only set onf of bit_16 or use_autocast to True"); sys.exit()
+
     num_devices = get_world_size()
     logger = logging.getLogger(__name__)
     logger.info("Start inference on {} images".format(len(data_loader)))
@@ -133,12 +137,21 @@ def inference_on_dataset(model, data_loader, evaluator):
     total_compute_time = 0
     with inference_context(model), torch.no_grad():
         for idx, inputs in enumerate(data_loader):
+
+            if bit_16:
+                for idx in range(len(inputs)):
+                    inputs[idx]['image'] = inputs[idx]['image'].half()
+
             if idx == num_warmup:
                 start_time = time.perf_counter()
                 total_compute_time = 0
 
             start_compute_time = time.perf_counter()
-            outputs = model(inputs)
+            if use_autocast:
+                with torch.cuda.amp.autocast():
+                    outputs = model(inputs)
+            else:
+                outputs = model(inputs, bit_16=bit_16)
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             total_compute_time += time.perf_counter() - start_compute_time

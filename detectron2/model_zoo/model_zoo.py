@@ -146,6 +146,9 @@ def get(config_path, trained: bool = False):
     if not torch.cuda.is_available():
         cfg.MODEL.DEVICE = "cpu"
 
+    print(cfg)
+    print(get_checkpoint_url(config_path))
+
     model = build_model(cfg)
     DetectionCheckpointer(model).load(cfg.MODEL.WEIGHTS)
     return model

@@ -122,7 +122,7 @@ class GeneralizedRCNN(nn.Module):
             storage.put_image(vis_name, vis_img)
             break  # only visualize one image in a batch
 
-    def forward(self, batched_inputs):
+    def forward(self, batched_inputs, bit_16=False):
         """
         Args:
             batched_inputs: a list, batched outputs of :class:`DatasetMapper` .
@@ -146,7 +146,7 @@ class GeneralizedRCNN(nn.Module):
                 "pred_boxes", "pred_classes", "scores", "pred_masks", "pred_keypoints"
         """
         if not self.training:
-            return self.inference(batched_inputs)
+            return self.inference(batched_inputs, bit_16=bit_16)
 
         images = self.preprocess_image(batched_inputs)
         if "instances" in batched_inputs[0]:
@@ -174,7 +174,7 @@ class GeneralizedRCNN(nn.Module):
         losses.update(proposal_losses)
         return losses
 
-    def inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
+    def inference(self, batched_inputs, detected_instances=None, do_postprocess=True, bit_16=False):
         """
         Run inference on the given inputs.
 
@@ -195,6 +195,8 @@ class GeneralizedRCNN(nn.Module):
 
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
+        if bit_16:
+            self.proposal_generator.half()
 
         if detected_instances is None:
             if self.proposal_generator:
@@ -202,6 +204,11 @@ class GeneralizedRCNN(nn.Module):
             else:
                 assert "proposals" in batched_inputs[0]
                 proposals = [x["proposals"].to(self.device) for x in batched_inputs]
+
+            if bit_16:
+                for idx in range(len(proposals)):
+                    for idx_bbox in range(len(proposals[idx]._fields['proposal_boxes'])):
+                        proposals[idx]._fields['proposal_boxes'].tensor = proposals[idx]._fields['proposal_boxes'].tensor.half()
 
             results, _ = self.roi_heads(images, features, proposals, None)
         else:
