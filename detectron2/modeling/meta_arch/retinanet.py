@@ -11,6 +11,7 @@ from detectron2.data.detection_utils import convert_image_to_rgb
 from detectron2.layers import ShapeSpec, batched_nms, cat
 from detectron2.structures import Boxes, ImageList, Instances, pairwise_iou
 from detectron2.utils.events import get_event_storage
+from detectron2.utils.box_ops import *
 
 from ..anchor_generator import build_anchor_generator
 from ..backbone import build_backbone
@@ -230,9 +231,29 @@ class RetinaNet(nn.Module):
             beta=self.smooth_l1_loss_beta,
             reduction="sum",
         )
+
+        gt_labels = gt_labels.flatten()
+        valid_idxs = gt_labels >= 0
+        foreground_idxs = (gt_labels >= 0) & (gt_labels != self.num_classes)
+        pred_logits = torch.cat(pred_logits, dim=1).view(-1, self.num_classes)
+        gt_labels_target = torch.zeros_like(pred_logits)
+        gt_labels_target[foreground_idxs, gt_labels[foreground_idxs]] = 1
+
+        N = gt_anchor_deltas.shape[0]
+        pred_anchor_deltas = torch.cat(pred_anchor_deltas, dim=1)
+        pred_anchor_deltas = pred_anchor_deltas.view(-1,4)
+        gt_anchor_deltas = gt_anchor_deltas.view(-1,4)
+        anchors = torch.cat(N*[anchors])
+        pred_boxes = self.box2box_transform.apply_deltas(pred_anchor_deltas, anchors)
+        gt_boxes = torch.cat(gt_boxes)
+        giou_loss = (1.0 - torch.diag(generalized_box_iou(gt_boxes[foreground_idxs],
+                                                          pred_boxes[foreground_idxs])))
+        giou_loss = giou_loss.sum() / gt_labels_target.sum()
+
         return {
             "loss_cls": loss_cls / self.loss_normalizer,
             "loss_box_reg": loss_box_reg / self.loss_normalizer,
+            'loss_giou': giou_loss
         }
 
     @torch.no_grad()
