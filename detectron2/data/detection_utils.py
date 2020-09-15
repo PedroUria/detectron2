@@ -59,9 +59,11 @@ _EXIF_ORIENT = 274  # exif 'Orientation' tag
 def convert_PIL_to_numpy(image, format):
     """
     Convert PIL image to numpy array of target format.
+
     Args:
         image (PIL.Image): a PIL image
         format (str): the format of output image
+
     Returns:
         (np.ndarray): also see `read_image`
     """
@@ -90,9 +92,11 @@ def convert_PIL_to_numpy(image, format):
 def convert_image_to_rgb(image, format):
     """
     Convert an image from given format to RGB.
+
     Args:
         image (np.ndarray or Tensor): an HWC image
         format (str): the format of input image, also see `read_image`
+
     Returns:
         (np.ndarray): (H,W,3) RGB image in 0-255 range, can be either float or uint8
     """
@@ -114,15 +118,19 @@ def convert_image_to_rgb(image, format):
 def _apply_exif_orientation(image):
     """
     Applies the exif orientation correctly.
+
     This code exists per the bug:
       https://github.com/python-pillow/Pillow/issues/3973
     with the function `ImageOps.exif_transpose`. The Pillow source raises errors with
     various methods, especially `tobytes`
+
     Function based on:
       https://github.com/wkentaro/labelme/blob/v4.5.4/labelme/utils/image.py#L59
       https://github.com/python-pillow/Pillow/blob/7.1.2/src/PIL/ImageOps.py#L527
+
     Args:
         image (PIL.Image): a PIL image
+
     Returns:
         (PIL.Image): the PIL image with exif orientation applied, if applicable
     """
@@ -158,9 +166,11 @@ def read_image(file_name, format=None):
     """
     Read an image into the given format.
     Will apply rotation and flipping if the image has such exif information.
+
     Args:
         file_name (str): image file path
         format (str): one of the supported image modes in PIL, or "BGR" or "YUV-BT.601".
+
     Returns:
         image (np.ndarray): an HWC image in the given format, which is 0-255, uint8 for
             supported image modes in PIL or "BGR"; float (0-1 for Y) for YUV-BT.601.
@@ -201,6 +211,7 @@ def check_image_size(dataset_dict, image):
 def transform_proposals(dataset_dict, image_shape, transforms, *, proposal_topk, min_box_size=0):
     """
     Apply transformations to the proposals in dataset_dict, if any.
+
     Args:
         dataset_dict (dict): a dict read from the dataset, possibly
             contains fields "proposal_boxes", "proposal_objectness_logits", "proposal_bbox_mode"
@@ -209,6 +220,7 @@ def transform_proposals(dataset_dict, image_shape, transforms, *, proposal_topk,
         proposal_topk (int): only keep top-K scoring proposals
         min_box_size (int): proposals with either side smaller than this
             threshold are removed
+
     The input dict is modified in-place, with abovementioned keys removed. A new
     key "proposals" will be added. Its value is an `Instances`
     object which contains the transformed proposals in its field
@@ -244,16 +256,19 @@ def transform_instance_annotations(
 ):
     """
     Apply transforms to box, segmentation and keypoints annotations of a single instance.
+
     It will use `transforms.apply_box` for the box, and
     `transforms.apply_coords` for segmentation polygons & keypoints.
     If you need anything more specially designed for each data structure,
     you'll need to implement your own version of this function or the transforms.
+
     Args:
         annotation (dict): dict of instance annotations for a single instance.
             It will be modified in-place.
         transforms (TransformList or list[Transform]):
         image_size (tuple): the height, width of the transformed image
         keypoint_hflip_indices (ndarray[int]): see `create_keypoint_hflip_indices`.
+
     Returns:
         dict:
             the same input dict with fields "bbox", "segmentation", "keypoints"
@@ -304,6 +319,7 @@ def transform_keypoint_annotations(keypoints, transforms, image_size, keypoint_h
     """
     Transform keypoint annotations of an image.
     If a keypoint is transformed out of image boundary, it will be marked "unlabeled" (visibility=0)
+
     Args:
         keypoints (list[float]): Nx3 float in Detectron2's Dataset format.
             Each point is represented by (x, y, visibility).
@@ -345,10 +361,12 @@ def annotations_to_instances(annos, image_size, mask_format="polygon"):
     """
     Create an :class:`Instances` object used by the models,
     from instance annotations in the dataset dict.
+
     Args:
         annos (list[dict]): a list of instance annotations in one image, each
             element for one instance.
         image_size (tuple): height, width
+
     Returns:
         Instances:
             It will contain fields "gt_boxes", "gt_classes",
@@ -409,10 +427,12 @@ def annotations_to_instances_rotated(annos, image_size):
     Create an :class:`Instances` object used by the models,
     from instance annotations in the dataset dict.
     Compared to `annotations_to_instances`, this function is for rotated boxes only
+
     Args:
         annos (list[dict]): a list of instance annotations in one image, each
             element for one instance.
         image_size (tuple): height, width
+
     Returns:
         Instances:
             Containing fields "gt_boxes", "gt_classes",
@@ -434,11 +454,13 @@ def annotations_to_instances_rotated(annos, image_size):
 def filter_empty_instances(instances, by_box=True, by_mask=True, box_threshold=1e-5):
     """
     Filter out empty instances in an `Instances` object.
+
     Args:
         instances (Instances):
         by_box (bool): whether to filter out instances with empty boxes
         by_mask (bool): whether to filter out instances with empty masks
         box_threshold (float): minimum width and height to be considered non-empty
+
     Returns:
         Instances: the filtered instances.
     """
@@ -485,6 +507,7 @@ def gen_crop_transform_with_instance(crop_size, image_size, instance):
     """
     Generate a CropTransform so that the cropping region contains
     the center of the given instance.
+
     Args:
         crop_size (tuple): h, w in pixels
         image_size (tuple): h, w
@@ -513,9 +536,11 @@ def gen_crop_transform_with_instance(crop_size, image_size, instance):
 def check_metadata_consistency(key, dataset_names):
     """
     Check that the datasets have consistent metadata.
+
     Args:
         key (str): a metadata key
         dataset_names (list[str]): a list of dataset names
+
     Raises:
         AttributeError: if the key does not exist in the metadata
         ValueError: if the given datasets do not have the same metadata values defined by key
@@ -541,6 +566,7 @@ def build_augmentation(cfg, is_train):
     """
     Create a list of default :class:`Augmentation` from config.
     Now it includes resizing and flipping.
+
     Returns:
         list[Augmentation]
     """
