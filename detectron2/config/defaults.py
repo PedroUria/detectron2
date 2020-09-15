@@ -575,6 +575,9 @@ _C.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = 1.0
 # gradient clipping type; for L-inf, please specify .inf
 _C.SOLVER.CLIP_GRADIENTS.NORM_TYPE = 2.0
 
+# mixed precision training
+_C.SOLVER.AMP = CN({"ENABLED": False})
+
 # ---------------------------------------------------------------------------- #
 # Specific test options
 # ---------------------------------------------------------------------------- #
@@ -601,6 +604,9 @@ _C.TEST.AUG.FLIP = True
 
 _C.TEST.PRECISE_BN = CN({"ENABLED": False})
 _C.TEST.PRECISE_BN.NUM_ITER = 200
+
+# mixed precision inference
+_C.TEST.AMP = CN({"ENABLED": False})
 
 # ---------------------------------------------------------------------------- #
 # Misc options
