@@ -78,6 +78,10 @@ def distance_box_iou(boxes1, boxes2):
     # so do an early check
     assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
     assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
+    if boxes1.dtype != torch.float32:
+        boxes1 = boxes1.float()
+    if boxes2.dtype != torch.float32:
+        boxes2 = boxes2.float()
     iou, union = box_iou(boxes1, boxes2)
 
     lt = torch.min(boxes1[:, None, :2], boxes2[:, :2])
