@@ -427,6 +427,9 @@ class RetinaNetHead(nn.Module):
             )
             bbox_subnet.append(nn.ReLU())
 
+        if hasattr(cfg, 'QUANTIZE') and cfg.QUANTIZE:
+            self.quant = torch.quantization.QuantStub()
+            self.dequant = torch.quantization.DeQuantStub()
         self.cls_subnet = nn.Sequential(*cls_subnet)
         self.bbox_subnet = nn.Sequential(*bbox_subnet)
         self.cls_score = nn.Conv2d(
@@ -464,6 +467,10 @@ class RetinaNetHead(nn.Module):
         logits = []
         bbox_reg = []
         for feature in features:
-            logits.append(self.cls_score(self.cls_subnet(feature)))
-            bbox_reg.append(self.bbox_pred(self.bbox_subnet(feature)))
+            if hasattr(self, 'quant'):
+                logits.append(self.dequant(self.cls_score(self.cls_subnet(self.quant(feature)))))
+                bbox_reg.append(self.dequant(self.bbox_pred(self.bbox_subnet(self.quant(feature)))))
+            else:
+                logits.append(self.cls_score(self.cls_subnet(feature)))
+                bbox_reg.append(self.bbox_pred(self.bbox_subnet(feature)))
         return logits, bbox_reg

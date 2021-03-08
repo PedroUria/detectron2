@@ -3,6 +3,7 @@ import math
 import fvcore.nn.weight_init as weight_init
 import torch.nn.functional as F
 from torch import nn
+import torch
 
 from detectron2.layers import Conv2d, ShapeSpec, get_norm
 
@@ -20,7 +21,7 @@ class FPN(Backbone):
     """
 
     def __init__(
-        self, bottom_up, in_features, out_channels, norm="", top_block=None, fuse_type="sum"
+        self, bottom_up, in_features, out_channels, norm="", top_block=None, fuse_type="sum", quant=False
     ):
         """
         Args:
@@ -102,6 +103,10 @@ class FPN(Backbone):
         assert fuse_type in {"avg", "sum"}
         self._fuse_type = fuse_type
 
+        if quant:
+            self.quant = torch.quantization.QuantStub()
+            self.dequant = torch.quantization.DeQuantStub()
+
     @property
     def size_divisibility(self):
         return self._size_divisibility
@@ -120,7 +125,10 @@ class FPN(Backbone):
                 ["p2", "p3", ..., "p6"].
         """
         # Reverse feature maps into top-down order (from low to high resolution)
-        bottom_up_features = self.bottom_up(x)
+        if hasattr(self, 'quant'):
+            bottom_up_features = self.bottom_up(self.quant(x))
+        else:
+            bottom_up_features = self.bottom_up(x)
         x = [bottom_up_features[f] for f in self.in_features[::-1]]
         results = []
         prev_features = self.lateral_convs[0](x[0])
@@ -139,8 +147,13 @@ class FPN(Backbone):
             top_block_in_feature = bottom_up_features.get(self.top_block.in_feature, None)
             if top_block_in_feature is None:
                 top_block_in_feature = results[self._out_features.index(self.top_block.in_feature)]
-            results.extend(self.top_block(top_block_in_feature))
+            if hasattr(self, 'quant'):
+                results.extend(self.top_block(self.quant(top_block_in_feature)))
+            else:
+                results.extend(self.top_block(top_block_in_feature))
         assert len(self._out_features) == len(results)
+        if hasattr(self, 'quant'):
+            return dict(zip(self._out_features, self.dequant(results)))
         return dict(zip(self._out_features, results))
 
     def output_shape(self):
@@ -217,6 +230,7 @@ def build_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
         norm=cfg.MODEL.FPN.NORM,
         top_block=LastLevelMaxPool(),
         fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
+        quant=cfg.QUANTIZE if hasattr(cfg, 'QUANTIZE') else False
     )
     return backbone
 
@@ -241,5 +255,6 @@ def build_retinanet_resnet_fpn_backbone(cfg, input_shape: ShapeSpec):
         norm=cfg.MODEL.FPN.NORM,
         top_block=LastLevelP6P7(in_channels_p6p7, out_channels),
         fuse_type=cfg.MODEL.FPN.FUSE_TYPE,
+        quant=cfg.QUANTIZE if hasattr(cfg, 'QUANTIZE') else False
     )
     return backbone
