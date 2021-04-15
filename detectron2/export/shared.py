@@ -1,14 +1,14 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 
 import collections
 import contextlib
 import copy
 import functools
 import logging
-import mock
 import numpy as np
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from unittest import mock
 import caffe2.python.utils as putils
 import torch
 import torch.nn.functional as F
@@ -753,7 +753,6 @@ def get_sub_graph_external_input_output(
     """
     Return the list of external input/output of sub-graph,
     each element is tuple of the name and corresponding version in predict_net.
-
     external input/output is defined the same way as caffe2 NetDef.
     """
     ssa, versions = core.get_ssa(predict_net)
@@ -856,10 +855,8 @@ def identify_reshape_sub_graph(predict_net: caffe2_pb2.NetDef) -> List[List[int]
     """
     Idenfity the reshape sub-graph in a protobuf.
     The reshape sub-graph is defined as matching the following pattern:
-
     (input_blob) -> Op_1 -> ... -> Op_N -> (new_shape) -─┐
         └-------------------------------------------> Reshape -> (output_blob)
-
     Return:
         List of sub-graphs, each sub-graph is represented as a list of indices
         of the relavent ops, [Op_1, Op_2, ..., Op_N, Reshape]

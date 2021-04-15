@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 
 import copy
 import io
@@ -33,11 +33,9 @@ logger = logging.getLogger(__name__)
 def export_onnx_model(model, inputs):
     """
     Trace and export a model to onnx format.
-
     Args:
         model (nn.Module):
         inputs (tuple[args]): the model will be called by `model(*inputs)`
-
     Returns:
         an onnx model
     """
@@ -129,7 +127,6 @@ def _assign_device_option(
 def export_caffe2_detection_model(model: torch.nn.Module, tensor_inputs: List[torch.Tensor]):
     """
     Export a caffe2-compatible Detectron2 model to caffe2 format via ONNX.
-
     Arg:
         model: a caffe2-compatible version of detectron2 model, defined in caffe2_modeling.py
         tensor_inputs: a list of tensors that caffe2 model takes as input.
@@ -139,7 +136,10 @@ def export_caffe2_detection_model(model: torch.nn.Module, tensor_inputs: List[to
     assert hasattr(model, "encode_additional_info")
 
     # Export via ONNX
-    logger.info("Exporting a {} model via ONNX ...".format(type(model).__name__))
+    logger.info(
+        "Exporting a {} model via ONNX ...".format(type(model).__name__)
+        + " Some warnings from ONNX are expected and are usually not to worry about."
+    )
     onnx_model = export_onnx_model(model, (tensor_inputs,))
     # Convert ONNX model to Caffe2 protobuf
     init_net, predict_net = Caffe2Backend.onnx_graph_to_caffe2_net(onnx_model)
@@ -172,7 +172,6 @@ def export_caffe2_detection_model(model: torch.nn.Module, tensor_inputs: List[to
 def run_and_save_graph(predict_net, init_net, tensor_inputs, graph_save_path):
     """
     Run the caffe2 model on given inputs, recording the shape and draw the graph.
-
     predict_net/init_net: caffe2 model.
     tensor_inputs: a list of tensors that caffe2 model takes as input.
     graph_save_path: path for saving graph of exported model.

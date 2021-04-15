@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 
 import functools
 import io
@@ -15,7 +15,7 @@ from detectron2.modeling.roi_heads import keypoint_head
 from detectron2.structures import Boxes, ImageList, Instances, RotatedBoxes
 
 from .c10 import Caffe2Compatible
-from .patcher import ROIHeadsPatcher, patch_generalized_rcnn
+from .caffe2_patch import ROIHeadsPatcher, patch_generalized_rcnn
 from .shared import (
     alias,
     check_set_pb_arg,
@@ -32,11 +32,9 @@ def assemble_rcnn_outputs_by_name(image_sizes, tensor_outputs, force_mask_on=Fal
     A function to assemble caffe2 model's outputs (i.e. Dict[str, Tensor])
     to detectron2's format (i.e. list of Instances instance).
     This only works when the model follows the Caffe2 detectron's naming convention.
-
     Args:
         image_sizes (List[List[int, int]]): [H, W] of every image.
         tensor_outputs (Dict[str, Tensor]): external_output to its tensor.
-
         force_mask_on (Bool): if true, the it make sure there'll be pred_masks even
             if the mask is not found from tensor_outputs (usually due to model crash)
     """
@@ -158,12 +156,10 @@ class Caffe2MetaArch(Caffe2Compatible, torch.nn.Module):
         """
         Convert pytorch-style structured inputs to caffe2-style inputs that
         are tuples of tensors.
-
         Args:
             batched_inputs (list[dict]): inputs to a detectron2 model
                 in its standard format. Each dict has "image" (CHW tensor), and optionally
                 "height" and "width".
-
         Returns:
             tuple[Tensor]:
                 tuple of tensors that will be the inputs to the
@@ -188,11 +184,9 @@ class Caffe2MetaArch(Caffe2Compatible, torch.nn.Module):
         """
         Run the forward in caffe2-style. It has to use caffe2-compatible ops
         and the method will be used for tracing.
-
         Args:
             inputs (tuple[Tensor]): inputs defined by :meth:`get_caffe2_input`.
                 They will be the inputs of the converted caffe2 graph.
-
         Returns:
             tuple[Tensor]: output tensors. They will be the outputs of the
                 converted caffe2 graph.
@@ -223,22 +217,16 @@ class Caffe2MetaArch(Caffe2Compatible, torch.nn.Module):
         detectron2's standard format.
         The function uses information in `predict_net` and `init_net` that are
         available at inferene time. Therefore the function logic can be used in inference.
-
         The returned function has the following signature:
-
             def convert(batched_inputs, c2_inputs, c2_results) -> detectron2_outputs
-
         Where
-
             * batched_inputs (list[dict]): the original input format of the meta arch
-            * c2_inputs (dict[str, Tensor]): the caffe2 inputs.
+            * c2_inputs (tuple[Tensor]): the caffe2 inputs.
             * c2_results (dict[str, Tensor]): the caffe2 output format,
                 corresponding to the outputs of the :meth:`forward` function.
             * detectron2_outputs: the original output format of the meta arch.
-
         This function can be used to compare the outputs of the original meta arch and
         the converted caffe2 graph.
-
         Returns:
             callable: a callable of the above signature.
         """
@@ -251,7 +239,9 @@ class Caffe2GeneralizedRCNN(Caffe2MetaArch):
         torch_model = patch_generalized_rcnn(torch_model)
         super().__init__(cfg, torch_model)
 
-        self.roi_heads_patcher = ROIHeadsPatcher(cfg, self._wrapped_model.roi_heads)
+        self.roi_heads_patcher = ROIHeadsPatcher(
+            self._wrapped_model.roi_heads, cfg.EXPORT_CAFFE2.USE_HEATMAP_MAX_KEYPOINT
+        )
 
     def encode_additional_info(self, predict_net, init_net):
         size_divisibility = self._wrapped_model.backbone.size_divisibility
@@ -275,7 +265,8 @@ class Caffe2GeneralizedRCNN(Caffe2MetaArch):
     @staticmethod
     def get_outputs_converter(predict_net, init_net):
         def f(batched_inputs, c2_inputs, c2_results):
-            image_sizes = [[int(im[0]), int(im[1])] for im in c2_inputs["im_info"]]
+            _, im_info = c2_inputs
+            image_sizes = [[int(im[0]), int(im[1])] for im in im_info]
             results = assemble_rcnn_outputs_by_name(image_sizes, c2_results)
             return meta_arch.GeneralizedRCNN._postprocess(results, batched_inputs, image_sizes)
 
@@ -288,7 +279,9 @@ class Caffe2PanopticFPN(Caffe2MetaArch):
         torch_model = patch_generalized_rcnn(torch_model)
         super().__init__(cfg, torch_model)
 
-        self.roi_heads_patcher = ROIHeadsPatcher(cfg, self._wrapped_model.roi_heads)
+        self.roi_heads_patcher = ROIHeadsPatcher(
+            self._wrapped_model.roi_heads, cfg.EXPORT_CAFFE2.USE_HEATMAP_MAX_KEYPOINT
+        )
 
     @mock_torch_nn_functional_interpolate()
     def forward(self, inputs):
@@ -315,29 +308,27 @@ class Caffe2PanopticFPN(Caffe2MetaArch):
         check_set_pb_arg(predict_net, "meta_architecture", "s", b"PanopticFPN")
 
         # Inference parameters:
-        check_set_pb_arg(predict_net, "combine_on", "i", self._wrapped_model.combine_on)
         check_set_pb_arg(
             predict_net,
             "combine_overlap_threshold",
             "f",
-            _cast_to_f32(self._wrapped_model.combine_overlap_threshold),
+            _cast_to_f32(self._wrapped_model.combine_overlap_thresh),
         )
         check_set_pb_arg(
             predict_net,
             "combine_stuff_area_limit",
             "i",
-            self._wrapped_model.combine_stuff_area_limit,
+            self._wrapped_model.combine_stuff_area_thresh,
         )
         check_set_pb_arg(
             predict_net,
             "combine_instances_confidence_threshold",
             "f",
-            _cast_to_f32(self._wrapped_model.combine_instances_confidence_threshold),
+            _cast_to_f32(self._wrapped_model.combine_instances_score_thresh),
         )
 
     @staticmethod
     def get_outputs_converter(predict_net, init_net):
-        combine_on = get_pb_arg_vali(predict_net, "combine_on", None)
         combine_overlap_threshold = get_pb_arg_valf(predict_net, "combine_overlap_threshold", None)
         combine_stuff_area_limit = get_pb_arg_vali(predict_net, "combine_stuff_area_limit", None)
         combine_instances_confidence_threshold = get_pb_arg_valf(
@@ -345,7 +336,8 @@ class Caffe2PanopticFPN(Caffe2MetaArch):
         )
 
         def f(batched_inputs, c2_inputs, c2_results):
-            image_sizes = [[int(im[0]), int(im[1])] for im in c2_inputs["im_info"]]
+            _, im_info = c2_inputs
+            image_sizes = [[int(im[0]), int(im[1])] for im in im_info]
             detector_results = assemble_rcnn_outputs_by_name(
                 image_sizes, c2_results, force_mask_on=True
             )
@@ -363,15 +355,14 @@ class Caffe2PanopticFPN(Caffe2MetaArch):
 
                 processed_results.append({"sem_seg": sem_seg_r, "instances": detector_r})
 
-                if combine_on:
-                    panoptic_r = combine_semantic_and_instance_outputs(
-                        detector_r,
-                        sem_seg_r.argmax(dim=0),
-                        combine_overlap_threshold,
-                        combine_stuff_area_limit,
-                        combine_instances_confidence_threshold,
-                    )
-                    processed_results[-1]["panoptic_seg"] = panoptic_r
+                panoptic_r = combine_semantic_and_instance_outputs(
+                    detector_r,
+                    sem_seg_r.argmax(dim=0),
+                    combine_overlap_threshold,
+                    combine_stuff_area_limit,
+                    combine_instances_confidence_threshold,
+                )
+                processed_results[-1]["panoptic_seg"] = panoptic_r
             return processed_results
 
         return f
@@ -392,7 +383,7 @@ class Caffe2RetinaNet(Caffe2MetaArch):
         return_tensors = [images.image_sizes]
 
         features = self._wrapped_model.backbone(images.tensor)
-        features = [features[f] for f in self._wrapped_model.in_features]
+        features = [features[f] for f in self._wrapped_model.head_in_features]
         for i, feature_i in enumerate(features):
             features[i] = alias(feature_i, "feature_{}".format(i), is_backward=True)
             return_tensors.append(features[i])
@@ -414,11 +405,13 @@ class Caffe2RetinaNet(Caffe2MetaArch):
 
         # Inference parameters:
         check_set_pb_arg(
-            predict_net, "score_threshold", "f", _cast_to_f32(self._wrapped_model.score_threshold)
+            predict_net, "score_threshold", "f", _cast_to_f32(self._wrapped_model.test_score_thresh)
         )
-        check_set_pb_arg(predict_net, "topk_candidates", "i", self._wrapped_model.topk_candidates)
         check_set_pb_arg(
-            predict_net, "nms_threshold", "f", _cast_to_f32(self._wrapped_model.nms_threshold)
+            predict_net, "topk_candidates", "i", self._wrapped_model.test_topk_candidates
+        )
+        check_set_pb_arg(
+            predict_net, "nms_threshold", "f", _cast_to_f32(self._wrapped_model.test_nms_thresh)
         )
         check_set_pb_arg(
             predict_net,
@@ -453,9 +446,9 @@ class Caffe2RetinaNet(Caffe2MetaArch):
         self.anchor_generator = torch.load(serialized_anchor_generator)
         bbox_reg_weights = get_pb_arg_floats(predict_net, "bbox_reg_weights", None)
         self.box2box_transform = Box2BoxTransform(weights=tuple(bbox_reg_weights))
-        self.score_threshold = get_pb_arg_valf(predict_net, "score_threshold", None)
-        self.topk_candidates = get_pb_arg_vali(predict_net, "topk_candidates", None)
-        self.nms_threshold = get_pb_arg_valf(predict_net, "nms_threshold", None)
+        self.test_score_thresh = get_pb_arg_valf(predict_net, "score_threshold", None)
+        self.test_topk_candidates = get_pb_arg_vali(predict_net, "topk_candidates", None)
+        self.test_nms_thresh = get_pb_arg_valf(predict_net, "nms_threshold", None)
         self.max_detections_per_image = get_pb_arg_vali(
             predict_net, "max_detections_per_image", None
         )
@@ -467,7 +460,8 @@ class Caffe2RetinaNet(Caffe2MetaArch):
         )
 
         def f(batched_inputs, c2_inputs, c2_results):
-            image_sizes = [[int(im[0]), int(im[1])] for im in c2_inputs["im_info"]]
+            _, im_info = c2_inputs
+            image_sizes = [[int(im[0]), int(im[1])] for im in im_info]
 
             num_features = len([x for x in c2_results.keys() if x.startswith("box_cls_")])
             pred_logits = [c2_results["box_cls_{}".format(i)] for i in range(num_features)]
