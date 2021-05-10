@@ -89,6 +89,11 @@ _C.INPUT.ROTATION = CN({"ENABLED": False})
 _C.INPUT.ROTATION.SAMPLING = "choice"
 # values for rotation
 _C.INPUT.ROTATION.VALUES = [90, 180, 270]
+# resizing
+_C.INPUT.RESIZE = CN({"ENABLED": False})
+# list of values for scaling (for any image, will randomly scale to one of these values, for example, 2.0 means upscale the image 2x)
+# for an input image of 3in resolution, if we want the model to generalize to 3in, 6in and 1ft res, then set to [0.25, 0.5, 1.0]
+_C.INPUT.RESIZE.VALUES = [0.25, 0.5, 1.0]
 
 # Whether the model needs RGB, YUV, HSV etc.
 # Should be one of the modes defined here, as we use PIL to read the image:

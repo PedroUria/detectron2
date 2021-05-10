@@ -14,6 +14,7 @@ from fvcore.transforms.transform import (
     VFlipTransform,
 )
 from PIL import Image
+import random
 
 from .augmentation import Augmentation
 from .transform import ExtentTransform, ResizeTransform, RotationTransform
@@ -29,6 +30,7 @@ __all__ = [
     "RandomLighting",
     "RandomRotation",
     "Resize",
+    "RandomResize",
     "ResizeShortestEdge",
     "RandomCrop_CategoryAreaConstraint",
 ]
@@ -122,6 +124,27 @@ class Resize(Augmentation):
         )
 
 
+class RandomResize(Augmentation):
+    """ Randomly resize image to a value of a list of fixed target sizes"""
+
+    def __init__(self, values, interp=Image.BILINEAR):
+        """
+        Args:
+            values: list of floats
+            interp: PIL interpolation method
+        """
+        self.values = values
+        self._init(locals())
+
+    def get_transform(self, img):
+        value = random.choice(self.values)
+        # print("original shape:", img.shape)
+        # print("resize factor:", value)
+        return ResizeTransform(
+            img.shape[0], img.shape[1], int(img.shape[0] * value), int(img.shape[1] * value), self.interp
+        )
+
+
 class ResizeShortestEdge(Augmentation):
     """
     Scale the shorter edge to the given size, with a limit of `max_size` on the longer edge.
@@ -154,6 +177,7 @@ class ResizeShortestEdge(Augmentation):
 
     def get_transform(self, img):
         h, w = img.shape[:2]
+        # print("Shape after random resizing:", img.shape)
         if self.is_range:
             size = np.random.randint(self.short_edge_length[0], self.short_edge_length[1] + 1)
         else:
@@ -172,6 +196,7 @@ class ResizeShortestEdge(Augmentation):
             neww = neww * scale
         neww = int(neww + 0.5)
         newh = int(newh + 0.5)
+        # print("Final shape:", (newh, neww))
         return ResizeTransform(h, w, newh, neww, self.interp)
 
 

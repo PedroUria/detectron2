@@ -592,6 +592,8 @@ def build_augmentation(cfg, is_train):
         if cfg.INPUT.ROTATION.ENABLED:
             augmentation.append(T.RandomRotation(cfg.INPUT.ROTATION.VALUES,
                                                  sample_style=cfg.INPUT.ROTATION.SAMPLING))
+        if cfg.INPUT.RESIZE.ENABLED:
+            augmentation = [T.RandomResize(cfg.INPUT.RESIZE.VALUES)] + augmentation
 
     return augmentation
 
